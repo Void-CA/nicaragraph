@@ -83,21 +83,36 @@ function drawMap(partial = []) {
         .attr("stroke-width", 0.5)
         .attr("fill", d => {
             const id = d.properties.GID_2;
-            if (id === startNode) return "#4CAF50";
-            if (id === endNode) return "#F44336";
-            if (pathResult.includes(id)) return "#FFC107";
-            if (partial.includes(id)) return "#42A5F5";
-            return "#E0F7FA";
+            
+            // ✅ MEJOR JERARQUÍA DE COLORES PARA LA ANIMACIÓN
+            if (id === startNode) return "#10B981"; // Verde brillante - inicio
+            if (id === endNode) return "#EF4444";   // Rojo brillante - fin
+            if (pathResult.includes(id)) return "#F59E0B"; // Amarillo/naranja - camino final
+            if (partial.includes(id)) return "#3B82F6";    // Azul brillante - nodos visitados
+            return "#E5E7EB"; // Gris claro - no visitado
+        })
+        .attr("opacity", d => {
+            const id = d.properties.GID_2;
+            // ✅ Dar más opacidad a los nodos importantes
+            if (pathResult.includes(id) || id === startNode || id === endNode) return 1;
+            if (partial.includes(id)) return 0.8;
+            return 0.6;
         })
         .style("cursor", "pointer")
         .on("click", (event, d) => {
             const clickedId = d.properties.GID_2;
             console.log("Municipio clickeado:", clickedId, d.properties.NAME_2);
-            // ✅ CORREGIDO: Pasar solo el ID, no el evento
             dispatch('click', clickedId);
         })
         .on("mouseover", (event, d) => {
-            tooltipContent = `${d.properties.NAME_2} (ID: ${d.properties.GID_2})`;
+            const id = d.properties.GID_2;
+            let status = "No visitado";
+            if (id === startNode) status = "Nodo de inicio";
+            else if (id === endNode) status = "Nodo final";
+            else if (pathResult.includes(id)) status = "En el camino";
+            else if (visitedNodes.includes(id)) status = "Visitado";
+            
+            tooltipContent = `${d.properties.NAME_2} (${status})`;
             tooltipVisible = true;
         })
         .on("mousemove", event => {

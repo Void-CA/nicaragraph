@@ -3,7 +3,9 @@ import { onMount } from "svelte";
 import Map from "./components/Map.svelte";
 import Sidebar from "./components/Sidebar.svelte";
 
-import init, { run_astar } from "../pkg/nicaragua_graph.js";
+// ✅ IMPORTAR TODAS LAS FUNCIONES
+import init, { run_astar, run_bfs, run_dfs, run_dijkstra } from "../pkg/nicaragua_graph.js";
+import { handleWasmResult } from "./lib/utils";
 
 let graph = null;
 let geojson = null;
@@ -29,23 +31,21 @@ onMount(async () => {
         graph = await graphResponse.json();
         geojson = await geoResponse.json();
 
-        await init();
-        wasmInitialized = true;
+            await init();
+            wasmInitialized = true;
     } catch (error) {
         console.error("Error loading data:", error);
     }
 });
 
-// ✅ CORREGIDO: Recibir solo el ID, no el evento
 function handleMapClick(event) {
-    const clickedId = event.detail; // ✅ Ahora event.detail contiene el ID
+    const clickedId = event.detail;
     if (isRunning) return;
     
     if (!startNode) {
         startNode = clickedId;
     } else if (!endNode && clickedId !== startNode) {
         endNode = clickedId;
-        console.log("End node set:", clickedId);
     } else {
         startNode = clickedId;
         endNode = null;
@@ -55,35 +55,35 @@ function handleMapClick(event) {
     }
 }
 
-// Ejecutar algoritmo con validaciones mejoradas
+function findNode(nodeId) {
+    return graph?.nodes?.find(node => node.id === nodeId);
+}
+
 async function runAlgorithm() {
     if (!wasmInitialized || !graph) {
-        console.error("WASM or graph not initialized");
+        console.error("❌ WASM or graph not initialized");
         return;
     }
 
     if (!startNode) {
-        console.error("No start node selected");
+        console.error("❌ No start node selected");
         return;
     }
 
-    if (selectedAlgorithm !== "bfs" && !endNode) {
-        console.error("No end node selected for this algorithm");
+    if ((selectedAlgorithm === "a_star" || selectedAlgorithm === "bfs" || selectedAlgorithm === "dfs" || selectedAlgorithm === "dijkstra") && !endNode) {
+        console.error("❌ No end node selected for", selectedAlgorithm);
         return;
     }
 
-
-    // ✅ Validar que los nodos existen en el grafo
-    if (!graph.nodes.find(node => node.id === startNode)) {
-        console.error("Start node not found in graph:", startNode);
+    if (!findNode(startNode)) {
+        console.error("❌ Start node not found in graph:", startNode);
         return;
     }
 
-    if (endNode && !graph.nodes.find(node => node.id === endNode)) {
-        console.error("End node not found in graph:", endNode);
+    if (endNode && !findNode(endNode)) {
+        console.error("❌ End node not found in graph:", endNode);
         return;
     }
-
 
     if (isRunning) return;
     isRunning = true;
@@ -94,56 +94,67 @@ async function runAlgorithm() {
         visitedNodes = [];
         totalCost = 0;
 
-        console.log("Running A* from", startNode, "to", endNode);
+        
         
         let result;
+        
         switch (selectedAlgorithm) {
             case "a_star":
-                // ✅ Pasar los IDs correctamente validados
                 result = run_astar(startNode, endNode, graph);
                 break;
+            case "bfs":
+                result = run_bfs(startNode, endNode, graph);
+                break;
+            case "dfs":
+                result = run_dfs(startNode, endNode, graph);
+                break;
+            case "dijkstra":
+                result = run_dijkstra(startNode,endNode, graph);
+                break;
             default:
-                console.warn("Algorithm not implemented:", selectedAlgorithm);
+                console.warn("⚠️ Algorithm not implemented:", selectedAlgorithm);
+                isRunning = false;
                 return;
         }
 
-        console.log("Algorithm raw result:", result);
-
-        if (!result || !Array.isArray(result)) {
-            console.error("Invalid result format from algorithm");
-            return;
-        }
-
-        // ✅ Manejar diferentes estructuras de resultado
-        const path = Array.isArray(result[0]) ? result[0] : [];
-        const cost = typeof result[1] === 'number' ? result[1] : 0;
-        const visited = Array.isArray(result[2]) ? result[2] : [];
-
-        console.log("Processed - Path:", path, "Cost:", cost, "Visited:", visited.length);
-
-        // Animar nodos visitados
+        const { path, visited, cost } = handleWasmResult(result);
+        // Animación mejorada
         if (visited && visited.length > 0) {
             const tempVisited = [];
             for (let i = 0; i < visited.length; i++) {
                 tempVisited.push(visited[i]);
                 visitedNodes = [...tempVisited];
-                await new Promise(resolve => setTimeout(resolve, 30)); // Más rápido para debug
+
+                // Velocidad adaptable según cantidad de nodos
+                const baseSpeed = visited.length > 100 ? 10 : 30;
+                const speed = i < visited.length * 0.8 ? baseSpeed : baseSpeed * 2;
+                await new Promise(resolve => setTimeout(resolve, speed));
             }
+
+            // Pequeña pausa antes de mostrar el camino
+            await new Promise(resolve => setTimeout(resolve, 200));
+
+            // Animación del camino final (solo si hay camino)
+            if (path && path.length > 0) {
+                const tempPath = [];
+                for (let i = 0; i < path.length; i++) {
+                    tempPath.push(path[i]);
+                    pathResult = [...tempPath];
+                    await new Promise(resolve => setTimeout(resolve, 150));
+                }
+            }
+        } else {
+            // Si no hay datos de visitados, mostrar el camino directamente
+            pathResult = path || [];
         }
 
-        pathResult = path;
-        totalCost = cost;
+        totalCost = cost || 0;
         
-        console.log("Algorithm completed successfully");
+        // Algoritmo completado
         
     } catch (error) {
-        console.error("Error running algorithm:", error);
-        console.error("Error details:", {
-            startNode,
-            endNode, 
-            graphKeys: Object.keys(graph).length,
-            wasmInitialized
-        });
+        console.error("❌ Error running", selectedAlgorithm, ":", error);
+        console.error("Error details:", error.stack);
     } finally {
         isRunning = false;
     }
@@ -156,8 +167,9 @@ function reset() {
     visitedNodes = [];
     totalCost = 0;
     isRunning = false;
-    console.log("Reset complete");
+    
 }
+
 </script>
 
 <div class="grid grid-cols-[70%_30%] gap-4 h-[90vh] mt-5 items-center">
@@ -182,4 +194,6 @@ function reset() {
         on:reset={reset}
         bind:selectedAlgorithm
     />
+
+    
 </div>
