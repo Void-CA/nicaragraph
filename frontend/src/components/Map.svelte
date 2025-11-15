@@ -47,9 +47,9 @@ let resizeObserver;
 // Paleta de colores profesional
 const colors = {
     background: "#f8fafc",
-    default: "#e2e8f0",
-    defaultHover: "#cbd5e1",
-    border: "#cbd5e1",
+    default: "#113",
+    defaultHover: "#116",
+    border: "#ddd",
     start: "#059669",      // Verde esmeralda
     end: "#dc2626",        // Rojo vibrante
     path: "#d97706",       // Ámbar
