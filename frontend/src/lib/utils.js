@@ -11,3 +11,25 @@ export function handleWasmResult(resultMap) {
     return { path, visited, cost };
 }
 
+export async function id_to_name(nodeId) {
+    const graphData = await fetchData();
+    if (!graphData) {
+        console.error("❌ No graph data available");
+        return null;
+    }
+    return graphData.nodes.find(node => node.id === nodeId);
+}
+
+export async function fetchData() {
+    try {
+        const response = await fetch('/data/graph.json');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error("❌ Error fetching data:", error);
+        return null;
+    }
+}

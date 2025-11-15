@@ -38,6 +38,13 @@ onMount(async () => {
     }
 });
 
+$: startNodeName = startNode ? graph?.nodes?.find(n => n.id === startNode)?.name || 
+                                   graph?.nodes?.find(n => n.id === startNode)?.NAME_2 || 
+                                   startNode : null;
+
+$: endNodeName = endNode ? graph?.nodes?.find(n => n.id === endNode)?.name || 
+                                 graph?.nodes?.find(n => n.id === endNode)?.NAME_2 || 
+                                 endNode : null;
 function handleMapClick(event) {
     const clickedId = event.detail;
     if (isRunning) return;
@@ -187,8 +194,8 @@ function reset() {
         {pathResult}
         {totalCost}
         {visitedNodes}
-        {startNode}
-        {endNode}
+        {startNodeName}
+        {endNodeName}
         {isRunning}
         on:runAlgorithm={runAlgorithm}
         on:reset={reset}
